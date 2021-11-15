@@ -137,10 +137,10 @@ class Ball(pygame.sprite.Sprite):
         self.draw(screen)
 
     def draw(self, surface):
-        pygame.draw.circle(surface, self.color, [self.x, self.y], self.radius)
+        pygame.draw.circle(surface, self.color, [int(self.x), int(self.y)], int(self.radius))
 
 leftPaddle = Paddle(GREEN, PADDLE_SIZE, PADDLE_THICKNESS, WIDTH - PADDLE_SIZE, HEIGHT - PADDLE_THICKNESS, WIDTH/4 - PADDLE_SIZE/2, HEIGHT/4 * 3 - PADDLE_THICKNESS)
-rightPaddle = Paddle(BLUE, PADDLE_SIZE, PADDLE_THICKNESS, WIDTH - PADDLE_SIZE, HEIGHT - PADDLE_THICKNESS, WIDTH/4 * 3 - PADDLE_SIZE/2, HEIGHT - PADDLE_THICKNESS) 
+rightPaddle = Paddle(BLUE, PADDLE_SIZE, PADDLE_THICKNESS, WIDTH - PADDLE_SIZE, HEIGHT - PADDLE_THICKNESS, WIDTH/4 * 3 - PADDLE_SIZE/2, HEIGHT - PADDLE_THICKNESS)
 ball = Ball(BLACK, WIDTH/4 - BALL_RADIUS, HEIGHT/4 * 3 - PADDLE_THICKNESS - 2 * BALL_RADIUS, BALL_RADIUS)
 spriteGroup = pygame.sprite.Group()
 spriteGroup.add(leftPaddle)
@@ -206,9 +206,9 @@ while current_mode == MODE_PLAY:
     pygame.draw.rect(screen, RED, (0, HEIGHT/2, WIDTH/4, HEIGHT/4), 2)
     pygame.draw.rect(screen, RED, (WIDTH/4 * 3 - 1, HEIGHT/2, WIDTH/4, HEIGHT/4), 2)
     if playerTurn == RIGHT_PLAYER:
-        pygame.draw.circle(screen, leftPaddle.color, [WIDTH/4, 20], 15)
+        pygame.draw.circle(screen, leftPaddle.color, [int(WIDTH/4), 20], 15)
     else:
-        pygame.draw.circle(screen, rightPaddle.color, [WIDTH/4 * 3, 20], 15)
+        pygame.draw.circle(screen, rightPaddle.color, [int(WIDTH/4) * 3, 20], 15)
     text = FONT.render("%s:%s" % (str(score_left), str(score_right)), 1, GRAY)
     textpos = text.get_rect(centerx=WIDTH/2)
     screen.blit(text, textpos)
