@@ -7,6 +7,7 @@ import threading
 import queue
 import json
 import flask
+import numpy as np
 from PIL import Image
 from io import BytesIO
 import logging
@@ -136,7 +137,7 @@ BLUE  = (0 ,0, 255)
 GRAY  = (100, 100, 100)
 MODE_PLAY = 1
 MODE_QUIT = 0
-FRAME_RATE = 30
+FRAME_RATE = 120
 
 ##
 # Game Sounds and delay for losing
@@ -153,28 +154,91 @@ RIGHT_SOUND = pygame.mixer.Sound('beep-8.wav')
 # Game Vars
 #
 BUDGE = 5
-BALL_SPEED = 3
+BALL_INIT_SPEED = 3
+BALL_INIT_ANGLE = 30
+BALL_RANDOM_BOUNCE = 5
+BALL_PADLE_MAX_BOUNCE = 30
 BALL_RADIUS = 4
-PADDLE_SPEED = 3
+PADDLE_SPEED = BALL_INIT_SPEED*0.7
 PADDLE_SIZE = 70
-PADDLE_THICKNESS = 4
+PADDLE_THICKNESS = 8
 LEFT_PLAYER = True
 RIGHT_PLAYER = False
 muted = False
-speed_x = BALL_SPEED
-speed_y = -BALL_SPEED
 score_left = 0
 score_right = 0
 playerTurn = LEFT_PLAYER
 current_mode = MODE_PLAY
+remote_mode = False
+
+def rotation_matrix(theta):
+    theta *= np.pi/180
+    matrix = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)]
+    ])
+
+    return matrix
+
+ball_angle = BALL_INIT_ANGLE
+ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+
+def is_toright(main_rect, sec_rect):
+    x1 = main_rect[0]
+    y1 = main_rect[1]
+    x2 = main_rect[0] + PADDLE_SIZE/2
+    y2 = main_rect[1] - PADDLE_THICKNESS/2
+    y = (y2 - y1)/(x2 - x1)*(sec_rect[0] - x1) + y1
+
+    if abs(y) < sec_rect[1]:
+        return True
+    else:
+        return False
+
+def is_toleft(main_rect, sec_rect):
+    x1 = main_rect[0]
+    y1 = main_rect[1]
+    x2 = main_rect[0] - PADDLE_SIZE/2
+    y2 = main_rect[1] - PADDLE_THICKNESS/2
+    y = (y2 - y1)/(x2 - x1)*(sec_rect[0] - x1) + y1
+
+    if abs(y) < sec_rect[1]:
+        return True
+    else:
+        return False
+
+def is_above(main_rect, sec_rect):
+    x1 = main_rect[1]
+    y1 = main_rect[0]
+    x2 = main_rect[1] + PADDLE_THICKNESS/2
+    y2 = main_rect[0] - PADDLE_SIZE/2
+    y = (y2 - y1)/(x2 - x1)*(sec_rect[1] - x1) + y1
+
+    if abs(y) > sec_rect[0]:
+        return True
+    else:
+        return False
+
+def is_under(main_rect, sec_rect):
+    x1 = main_rect[1]
+    y1 = main_rect[0]
+    x2 = main_rect[1] - PADDLE_THICKNESS/2
+    y2 = main_rect[0] - PADDLE_SIZE/2
+    y = (y2 - y1)/(x2 - x1)*(sec_rect[1] - x1) + y1
+
+    if abs(y) > sec_rect[0]:
+        return True
+    else:
+        return False
+
 
 ##
 # Action on player score
 #
-def score():
-    global playerTurn, score_left, score_right, leftPaddle, rightPaddle, ball, speed_y
+def score(playerTurn):
+    global score_left, score_right, leftPaddle, rightPaddle, ball, ball_vector, ball_angle
     if playerTurn == LEFT_PLAYER:
-        score_left += 1                
+        score_left += 1
         leftPaddle.x = WIDTH/4 - PADDLE_SIZE/2
         leftPaddle.y = HEIGHT - PADDLE_THICKNESS
         rightPaddle.x = WIDTH/4 * 3 - PADDLE_SIZE/2
@@ -188,8 +252,8 @@ def score():
         rightPaddle.y = HEIGHT - PADDLE_THICKNESS
         ball.x = WIDTH/4
     ball.y = HEIGHT/4 * 3 - PADDLE_THICKNESS - 2 * BALL_RADIUS
-    speed_y = -abs(speed_y)
-    return not playerTurn
+    ball_angle = np.random.uniform(-20, 20)
+    ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
 
 ##
 # Game Objects
@@ -256,10 +320,11 @@ spriteGroup.add(ball)
 ##
 # Game loop
 #
+frame_cnt = 0
 while current_mode == MODE_PLAY:
     ##
     # Handle keyboard
-    #
+    # TODO remove this
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             current_mode = MODE_QUIT
@@ -269,61 +334,96 @@ while current_mode == MODE_PLAY:
             elif event.key == pygame.K_m:
                 muted = not muted
 
-    left_client_req = None
-    try:
-        left_client_req = left_ctrl_q.get_nowait()
-    except queue.Empty:
-        pass
+    if remote_mode:
+        left_client_req = None
+        try:
+            left_client_req = left_ctrl_q.get_nowait()
+        except queue.Empty:
+            pass
 
-    if left_client_req is not None:
-        left_cmd = left_client_req['cmd']
+        if left_client_req is not None:
+            left_cmd = left_client_req['cmd']
+        else:
+            left_cmd = ''
+
+        if left_cmd == 'up_left':
+            leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif left_cmd == 'up_right':
+            leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif left_cmd == 'down_left':
+            leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif left_cmd == 'down_right':
+            leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif left_cmd == 'up':
+            leftPaddle.move(0, -PADDLE_SPEED)
+        elif left_cmd == 'down':
+            leftPaddle.move(0, PADDLE_SPEED)
+        elif left_cmd == 'up_left':
+            leftPaddle.move(-PADDLE_SPEED, 0)
+        elif left_cmd == 'down_right':
+            leftPaddle.move(PADDLE_SPEED, 0)
+
+        right_client_req = None
+        try:
+            right_client_req = right_ctrl_q.get_nowait()
+        except queue.Empty:
+            pass
+
+        if right_client_req is not None:
+            right_cmd = right_client_req['cmd']
+        else:
+            right_cmd = ''
+
+        if right_cmd == 'up_left':
+            rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif right_cmd == 'up_right':
+            rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif right_cmd == 'down_left':
+            rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif right_cmd == 'down_right':
+            rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif right_cmd == 'up':
+            rightPaddle.move(0, -PADDLE_SPEED)
+        elif right_cmd == 'down':
+            rightPaddle.move(0, PADDLE_SPEED)
+        elif right_cmd == 'up_left':
+            rightPaddle.move(-PADDLE_SPEED, 0)
+        elif right_cmd == 'down_right':
+            rightPaddle.move(PADDLE_SPEED, 0)
     else:
-        left_cmd = ''
-
-    if left_cmd == 'up_left':
-        leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-    elif left_cmd == 'up_right':
-        leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-    elif left_cmd == 'down_left':
-        leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-    elif left_cmd == 'down_right':
-        leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-    elif left_cmd == 'up':
-        leftPaddle.move(0, -PADDLE_SPEED)
-    elif left_cmd == 'down':
-        leftPaddle.move(0, PADDLE_SPEED)
-    elif left_cmd == 'up_left':
-        leftPaddle.move(-PADDLE_SPEED, 0)
-    elif left_cmd == 'down_right':
-        leftPaddle.move(PADDLE_SPEED, 0)
-
-    right_client_req = None
-    try:
-        right_client_req = right_ctrl_q.get_nowait()
-    except queue.Empty:
-        pass
-
-    if right_client_req is not None:
-        right_cmd = right_client_req['cmd']
-    else:
-        right_cmd = ''
-
-    if right_cmd == 'up_left':
-        rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-    elif right_cmd == 'up_right':
-        rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-    elif right_cmd == 'down_left':
-        rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-    elif right_cmd == 'down_right':
-        rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-    elif right_cmd == 'up':
-        rightPaddle.move(0, -PADDLE_SPEED)
-    elif right_cmd == 'down':
-        rightPaddle.move(0, PADDLE_SPEED)
-    elif right_cmd == 'up_left':
-        rightPaddle.move(-PADDLE_SPEED, 0)
-    elif right_cmd == 'down_right':
-        rightPaddle.move(PADDLE_SPEED, 0)
+        keysPressed = pygame.key.get_pressed()
+        if keysPressed[pygame.K_UP] and keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_UP] and keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_UP]:
+            rightPaddle.move(0, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN]:
+            rightPaddle.move(0, PADDLE_SPEED)
+        elif keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, 0)
+        elif keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, 0)
+        if keysPressed[pygame.K_w] and keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_w] and keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_w]:
+            leftPaddle.move(0, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_s]:
+            leftPaddle.move(0, PADDLE_SPEED)
+        elif keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, 0)
+        elif keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, 0)
 
     ##
     # Draw arena, score and player turn color
@@ -347,57 +447,73 @@ while current_mode == MODE_PLAY:
     if ball.y > HEIGHT:
         if not muted:
             LOSE_SOUND.play()
-        playerTurn = score()
+        score(playerTurn)
+        playerTurn = not playerTurn
         pygame.time.delay(LOSE_DELAY)
     elif ball.y < 0:
-        speed_y = -speed_y
+        ball_angle = 180 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
     if ball.x > WIDTH:
-        speed_x = -speed_x
+        ball_angle = 360 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
     elif ball.x < 0:
-        speed_x = abs(speed_x)
-    ball.y = ball.y + speed_y
-    ball.x = ball.x + speed_x
+        ball_angle = 360 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
 
+    ball.y = ball.y + ball_vector[1]
+    ball.x = ball.x + ball_vector[0]
     ##
     # Bounce ball off paddles and paddles off each other
     #
     if leftPaddle.rect.colliderect(ball.rect):
-        if playerTurn == LEFT_PLAYER:
+        if ball.y > leftPaddle.rect.top:
+            score(RIGHT_PLAYER)
+            playerTurn = not playerTurn
+            pygame.time.delay(LOSE_DELAY)
+        elif playerTurn == LEFT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            playerTurn = score()
+            score(playerTurn)
+            playerTurn = not playerTurn
             pygame.time.delay(LOSE_DELAY)
         else:
             ball.y = leftPaddle.y - 2 * BALL_RADIUS
-            speed_y = -speed_y
+            ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
+            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
             playerTurn = not playerTurn
             if not muted:
                 LEFT_SOUND.play()
     elif rightPaddle.rect.colliderect(ball.rect):
-        if playerTurn == RIGHT_PLAYER:
+        if ball.y > rightPaddle.rect.top:
+            score(LEFT_PLAYER)
+            playerTurn = not playerTurn
+            pygame.time.delay(LOSE_DELAY)
+        elif playerTurn == RIGHT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-                pygame.time.delay(LOSE_DELAY)
-            playerTurn = score()
+            score(playerTurn)
+            playerTurn = not playerTurn
+            pygame.time.delay(LOSE_DELAY)
         else:
             ball.y = rightPaddle.y - 2 * BALL_RADIUS
-            speed_y = -speed_y
+            ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
+            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
             playerTurn = not playerTurn
             if not muted:
                 RIGHT_SOUND.play()
     if leftPaddle.rect.colliderect(rightPaddle):
-        if leftPaddle.rect.bottom >= rightPaddle.rect.top:
-            leftPaddle.move(0, -BUDGE)
-            rightPaddle.move(0, BUDGE)
-        elif rightPaddle.rect.bottom >= leftPaddle.rect.top:
-            rightPaddle.move(0, -BUDGE)
-            leftPaddle.move(0, BUDGE)
-        elif leftPaddle.rect.right >= rightPaddle.rect.left:
-            leftPaddle.move(-BUDGE, 0)
+        if is_toright(leftPaddle.rect.center, rightPaddle.rect.center):
             rightPaddle.move(BUDGE, 0)
-        elif rightPaddle.rect.right >= leftPaddle.rect.left:
+            leftPaddle.move(-BUDGE, 0)
+        if is_toleft(leftPaddle.rect.center, rightPaddle.rect.center):
             rightPaddle.move(-BUDGE, 0)
             leftPaddle.move(BUDGE, 0)
+        if is_above(leftPaddle.rect.center, rightPaddle.rect.center):
+            rightPaddle.move(0, -BUDGE)
+            leftPaddle.move(0, BUDGE)
+        if is_under(leftPaddle.rect.center, rightPaddle.rect.center):
+            rightPaddle.move(0, BUDGE)
+            leftPaddle.move(0, -BUDGE)
 
     ##
     # Draw paddles and ball
@@ -408,10 +524,13 @@ while current_mode == MODE_PLAY:
     ##
     # Tick-tock
     #
-    with frame_mutex:
-        frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
+    if frame_cnt % 4 == 0:
+        with frame_mutex:
+            frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
 
     pygame.display.update()
     clock.tick(FRAME_RATE)
+
+    frame_cnt += 1
 
 pygame.quit()
