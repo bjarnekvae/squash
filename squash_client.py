@@ -6,20 +6,32 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
+team_name = "Lg2"
+code = "1222"
+
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
-test = dict()
-ctr_url = "http://localhost:6010/ctrl"
+ctrl_url = "http://localhost:6010/ctrl"
 frame_url = "http://localhost:6010/get_frame"
+loginn_url = "http://localhost:6010/loginn"
+logout_url = "http://localhost:6010/logout"
 
+log_inn = {"name": team_name, "code": code}
+response = requests.put(loginn_url, data=json.dumps(log_inn))
+print(response.text)
 
-for i in tqdm(range(0, 999999)):
-    response = requests.get(frame_url)
-    img_arr = misc.imread(BytesIO(response.content))
-    cv2.imshow("img", img_arr)
-    cv2.waitKey(1)
+cmd = {"code": code, "cmd": ""}
 
-    test["cmd"] = "down_left"
-    response = requests.put(ctr_url, data=json.dumps(test))
-    time.sleep(0.001)
+try:
+    for i in tqdm(range(0, 999999)):
+        response = requests.get(frame_url)
+        img_arr = misc.imread(BytesIO(response.content))
+        cv2.imshow("img", img_arr)
+        cv2.waitKey(1)
 
+        cmd["cmd"] = "up_right"
+        response = requests.put(ctrl_url, data=json.dumps(cmd))
+        time.sleep(0.001)
+finally:
+    response = requests.put(logout_url, data=json.dumps(cmd))
+    print(response.text)

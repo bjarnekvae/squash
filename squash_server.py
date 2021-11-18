@@ -5,16 +5,26 @@ import pygame
 import pygame.mixer
 import threading
 import queue
-import requests
 import json
 import flask
 from PIL import Image
 from io import BytesIO
+import logging
+logging.getLogger('werkzeug').disabled = True
 
-crtl_q = queue.Queue(1)
+left_ctrl_q = queue.Queue(1)
+right_ctrl_q = queue.Queue(1)
+
 app = flask.Flask(__name__)
 frame = None
 frame_mutex = threading.Lock()
+
+left_player = dict()
+left_player['ip'] = ''
+left_player['name'] = ''
+left_player['code'] = ''
+right_player = left_player.copy()
+player_mutex = threading.Lock()
 
 
 @app.route('/get_frame', methods=['GET'])
@@ -36,17 +46,68 @@ def get_frame():
 
 @app.route('/ctrl', methods=['PUT'])
 def get_ctrl():
-    record = json.loads(flask.request.data)
-    #print(flask.request.remote_addr)
+    client_data = json.loads(flask.request.data)
+    #player_ip = flask.request.remote_addr
+    resp = dict()
+    resp['status'] = ""
 
     try:
-        crtl_q.put_nowait(record)
+        if left_player['code'] == client_data['code']:
+            left_ctrl_q.put_nowait(client_data)
+            resp['status'] = "OK"
+        elif right_player['code'] == client_data['code']:
+            right_ctrl_q.put_nowait(client_data)
+            resp['status'] = "OK"
+        else:
+            resp['status'] = "Not logged inn"
     except queue.Full:
-        pass
+        resp['status'] = "Too fast!"
 
-    return record
+    return flask.jsonify(resp)
 
-threading.Thread(target=lambda: app.run(host='localhost', port=6010, debug=False, threaded=True), daemon=True).start()
+@app.route('/loginn', methods=['PUT'])
+def log_inn():
+    client_data = json.loads(flask.request.data)
+    #print(flask.request.remote_addr)
+    resp = dict()
+    resp['status'] = "full"
+
+    with player_mutex:
+        if left_player['code'] == '':
+            left_player['code'] = client_data['code']
+            left_player['name'] = client_data['name']
+            resp['status'] = "left"
+            print(client_data['name'], "({}) joined left side!".format(flask.request.remote_addr))
+        elif right_player['code'] == '':
+            right_player['code'] = client_data['code']
+            right_player['name'] = client_data['name']
+            resp['status'] = "right"
+            print(client_data['name'], "({}) joined left side!".format(flask.request.remote_addr))
+
+    return flask.jsonify(resp)
+
+@app.route('/logout', methods=['PUT'])
+def log_out():
+    client_data = json.loads(flask.request.data)
+    resp = dict()
+    resp['status'] = "Not logged inn"
+
+    with player_mutex:
+        if left_player['code'] == client_data['code']:
+            print(left_player['name'], "({}) left the game".format(flask.request.remote_addr))
+            left_player['code'] = ''
+            left_player['name'] = ''
+            resp['status'] = "OK"
+        elif right_player['code'] == client_data['code']:
+            print(right_player['name'], "({}) left the game".format(flask.request.remote_addr))
+            right_player['code'] = ''
+            right_player['name'] = ''
+            resp['status'] = "OK"
+
+    return flask.jsonify(resp)
+
+
+threading.Thread(target=lambda: app.run(host='localhost', port=6010, threaded=True), daemon=True).start()
 
 
 ##
@@ -208,52 +269,61 @@ while current_mode == MODE_PLAY:
             elif event.key == pygame.K_m:
                 muted = not muted
 
-    client_req = None
+    left_client_req = None
     try:
-        client_req = crtl_q.get_nowait()
+        left_client_req = left_ctrl_q.get_nowait()
     except queue.Empty:
         pass
 
-    if client_req is not None:
-        pressed = client_req['cmd']
+    if left_client_req is not None:
+        left_cmd = left_client_req['cmd']
     else:
-        pressed = ''
+        left_cmd = ''
 
-    if pressed == 'up_left':
-        rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-    elif pressed == 'up_right':
-        rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-    elif pressed == 'down_left':
-        rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-    elif  pressed == 'down_right':
-        rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-    elif pressed == 'up':
-        rightPaddle.move(0, -PADDLE_SPEED)
-    elif pressed == 'down':
-        rightPaddle.move(0, PADDLE_SPEED)
-    elif pressed == 'up_left':
-        rightPaddle.move(-PADDLE_SPEED, 0)
-    elif pressed == 'down_right':
-        rightPaddle.move(PADDLE_SPEED, 0)
-
-    '''
-    if keysPressed[pygame.K_w] and keysPressed[pygame.K_a]:
+    if left_cmd == 'up_left':
         leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-    elif keysPressed[pygame.K_w] and keysPressed[pygame.K_d]:
+    elif left_cmd == 'up_right':
         leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-    elif keysPressed[pygame.K_s] and keysPressed[pygame.K_a]:
+    elif left_cmd == 'down_left':
         leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-    elif keysPressed[pygame.K_s] and keysPressed[pygame.K_d]:
+    elif left_cmd == 'down_right':
         leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-    elif keysPressed[pygame.K_w]:
+    elif left_cmd == 'up':
         leftPaddle.move(0, -PADDLE_SPEED)
-    elif keysPressed[pygame.K_s]:
+    elif left_cmd == 'down':
         leftPaddle.move(0, PADDLE_SPEED)
-    elif keysPressed[pygame.K_a]:
+    elif left_cmd == 'up_left':
         leftPaddle.move(-PADDLE_SPEED, 0)
-    elif keysPressed[pygame.K_d]:
+    elif left_cmd == 'down_right':
         leftPaddle.move(PADDLE_SPEED, 0)
-    '''
+
+    right_client_req = None
+    try:
+        right_client_req = right_ctrl_q.get_nowait()
+    except queue.Empty:
+        pass
+
+    if right_client_req is not None:
+        right_cmd = right_client_req['cmd']
+    else:
+        right_cmd = ''
+
+    if right_cmd == 'up_left':
+        rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+    elif right_cmd == 'up_right':
+        rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+    elif right_cmd == 'down_left':
+        rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+    elif right_cmd == 'down_right':
+        rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+    elif right_cmd == 'up':
+        rightPaddle.move(0, -PADDLE_SPEED)
+    elif right_cmd == 'down':
+        rightPaddle.move(0, PADDLE_SPEED)
+    elif right_cmd == 'up_left':
+        rightPaddle.move(-PADDLE_SPEED, 0)
+    elif right_cmd == 'down_right':
+        rightPaddle.move(PADDLE_SPEED, 0)
 
     ##
     # Draw arena, score and player turn color
