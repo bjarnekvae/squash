@@ -157,7 +157,7 @@ BUDGE = 5
 BALL_INIT_SPEED = 3
 BALL_INIT_ANGLE = 30
 BALL_RANDOM_BOUNCE = 5
-BALL_PADLE_MAX_BOUNCE = 30
+BALL_PADLE_MAX_BOUNCE = 40
 BALL_RADIUS = 4
 PADDLE_SPEED = BALL_INIT_SPEED*0.7
 PADDLE_SIZE = 70
@@ -235,17 +235,15 @@ def is_under(main_rect, sec_rect):
 ##
 # Action on player score
 #
-def score(playerTurn):
+def reset_game(playerTurn):
     global score_left, score_right, leftPaddle, rightPaddle, ball, ball_vector, ball_angle
-    if playerTurn == LEFT_PLAYER:
-        score_left += 1
+    if playerTurn == RIGHT_PLAYER:
         leftPaddle.x = WIDTH/4 - PADDLE_SIZE/2
         leftPaddle.y = HEIGHT - PADDLE_THICKNESS
         rightPaddle.x = WIDTH/4 * 3 - PADDLE_SIZE/2
         rightPaddle.y = HEIGHT/4 * 3 - PADDLE_THICKNESS
         ball.x = WIDTH/4 * 3
     else:
-        score_right += 1
         leftPaddle.x = WIDTH/4 - PADDLE_SIZE/2
         leftPaddle.y = HEIGHT/4 * 3 - PADDLE_THICKNESS
         rightPaddle.x = WIDTH/4 * 3 - PADDLE_SIZE/2
@@ -447,8 +445,12 @@ while current_mode == MODE_PLAY:
     if ball.y > HEIGHT:
         if not muted:
             LOSE_SOUND.play()
-        score(playerTurn)
+        if playerTurn == RIGHT_PLAYER:
+            score_right += 1
+        elif playerTurn == LEFT_PLAYER:
+            score_left += 1
         playerTurn = not playerTurn
+        reset_game(playerTurn)
         pygame.time.delay(LOSE_DELAY)
     elif ball.y < 0:
         ball_angle = 180 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
@@ -467,15 +469,20 @@ while current_mode == MODE_PLAY:
     #
     if leftPaddle.rect.colliderect(ball.rect):
         if ball.y > leftPaddle.rect.top:
-            score(RIGHT_PLAYER)
-            playerTurn = not playerTurn
+            print("left player block!")
+            if not muted:
+                FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
+            score_right += 1
+            playerTurn = RIGHT_PLAYER
+            reset_game(playerTurn)
         elif playerTurn == LEFT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            score(playerTurn)
-            playerTurn = not playerTurn
             pygame.time.delay(LOSE_DELAY)
+            score_right += 1
+            playerTurn = RIGHT_PLAYER
+            reset_game(playerTurn)
         else:
             ball.y = leftPaddle.y - 2 * BALL_RADIUS
             ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
@@ -485,15 +492,20 @@ while current_mode == MODE_PLAY:
                 LEFT_SOUND.play()
     elif rightPaddle.rect.colliderect(ball.rect):
         if ball.y > rightPaddle.rect.top:
-            score(LEFT_PLAYER)
-            playerTurn = not playerTurn
+            print("right player block!")
             pygame.time.delay(LOSE_DELAY)
+            score_left += 1
+            playerTurn = LEFT_PLAYER
+            reset_game(playerTurn)
+
         elif playerTurn == RIGHT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            score(playerTurn)
-            playerTurn = not playerTurn
             pygame.time.delay(LOSE_DELAY)
+            score_left += 1
+            playerTurn = RIGHT_PLAYER
+            reset_game(playerTurn)
+
         else:
             ball.y = rightPaddle.y - 2 * BALL_RADIUS
             ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
