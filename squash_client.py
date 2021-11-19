@@ -6,7 +6,7 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
-team_name = "Lg2"
+team_name = "Løg"
 code = "1222"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
@@ -33,5 +33,5 @@ try:
         response = requests.put(ctrl_url, data=json.dumps(cmd))
         time.sleep(0.001)
 finally:
-    response = requests.put(logout_url, data=json.dumps(cmd))
+    response = requests.put(logout_url, data=json.dumps(log_inn))
     print(response.text)

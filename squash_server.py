@@ -15,6 +15,7 @@ logging.getLogger('werkzeug').disabled = True
 
 left_ctrl_q = queue.Queue(1)
 right_ctrl_q = queue.Queue(1)
+billboard_q = queue.Queue(1)
 
 app = flask.Flask(__name__)
 frame = None
@@ -85,6 +86,12 @@ def log_inn():
             resp['status'] = "right"
             print(client_data['name'], "({}) joined left side!".format(flask.request.remote_addr))
 
+        if resp['status'] is not "full":
+            try:
+                billboard_q.put_nowait("{} joined!".format(client_data['name']))
+            except queue.Full:
+                pass
+
     return flask.jsonify(resp)
 
 @app.route('/logout', methods=['PUT'])
@@ -104,6 +111,12 @@ def log_out():
             right_player['code'] = ''
             right_player['name'] = ''
             resp['status'] = "OK"
+
+        if resp['status'] is not "Not logged inn":
+            try:
+                billboard_q.put_nowait("{} left!".format(client_data['name']))
+            except queue.Full:
+                pass
 
     return flask.jsonify(resp)
 
@@ -169,7 +182,8 @@ score_left = 0
 score_right = 0
 playerTurn = LEFT_PLAYER
 current_mode = MODE_PLAY
-remote_mode = False
+remote_mode = True
+BILLBOARD_TEXT_VISIBLE = FRAME_RATE*1.5
 
 def rotation_matrix(theta):
     theta *= np.pi/180
@@ -319,6 +333,8 @@ spriteGroup.add(ball)
 # Game loop
 #
 frame_cnt = 0
+billboard_cnt = 0
+text = ''
 while current_mode == MODE_PLAY:
     ##
     # Handle keyboard
@@ -432,12 +448,42 @@ while current_mode == MODE_PLAY:
     pygame.draw.rect(screen, RED, (0, HEIGHT/2, WIDTH/4, HEIGHT/4), 2)
     pygame.draw.rect(screen, RED, (WIDTH/4 * 3 - 1, HEIGHT/2, WIDTH/4, HEIGHT/4), 2)
     if playerTurn == RIGHT_PLAYER:
-        pygame.draw.circle(screen, leftPaddle.color, [int(WIDTH/4), 20], 15)
+        pygame.draw.line(screen, leftPaddle.color, [int(WIDTH/16*2), 28], [int(WIDTH/16*6), 28], 3)
     else:
-        pygame.draw.circle(screen, rightPaddle.color, [int(WIDTH/4) * 3, 20], 15)
-    text = FONT.render("%s:%s" % (str(score_left), str(score_right)), 1, GRAY)
-    textpos = text.get_rect(centerx=WIDTH/2)
-    screen.blit(text, textpos)
+        pygame.draw.line(screen, rightPaddle.color, [int(WIDTH/16*10), 28], [int(WIDTH/16*14), 28], 3)
+    score_text = FONT.render("{}:{}".format(str(score_left), str(score_right)), 1, GRAY)
+    left_name_text = FONT.render(left_player['name'][:10], 1, leftPaddle.color)
+    right_name_text = FONT.render(right_player['name'][:10], 1, rightPaddle.color)
+    screen.blit(score_text, score_text.get_rect(centerx=WIDTH / 2))
+    screen.blit(left_name_text, left_name_text.get_rect(centerx=WIDTH / 4))
+    screen.blit(right_name_text, right_name_text.get_rect(centerx=WIDTH / 4*3))
+
+    try:
+        text = billboard_q.get_nowait()
+        billboard_cnt = frame_cnt
+        print(text)
+    except queue.Empty:
+        pass
+
+    if frame_cnt < billboard_cnt+BILLBOARD_TEXT_VISIBLE:
+        billboard_text = FONT.render(text, 1, RED)
+        screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/4))
+    else:
+        text = ''
+
+    frame_cnt += 1
+
+    if (left_player['name'] == '' or right_player['name'] == ''): ## TODO add remote mode exception
+        wait_text = "Wating for players..."
+        billboard_text = FONT.render(wait_text, 1, RED)
+        screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
+        pygame.display.update()
+        clock.tick(FRAME_RATE)
+        if frame_cnt % 4 == 0:
+            with frame_mutex:
+                frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
+        continue
+
 
     ##
     # Move ball and update scores
@@ -447,8 +493,16 @@ while current_mode == MODE_PLAY:
             LOSE_SOUND.play()
         if playerTurn == RIGHT_PLAYER:
             score_right += 1
+            try:
+                billboard_q.put_nowait("{} +1".format(right_player['name']))
+            except queue.Full:
+                pass
         elif playerTurn == LEFT_PLAYER:
             score_left += 1
+            try:
+                billboard_q.put_nowait("{} +1".format(left_player['name']))
+            except queue.Full:
+                pass
         playerTurn = not playerTurn
         reset_game(playerTurn)
         pygame.time.delay(LOSE_DELAY)
@@ -469,7 +523,10 @@ while current_mode == MODE_PLAY:
     #
     if leftPaddle.rect.colliderect(ball.rect):
         if ball.y > leftPaddle.rect.top:
-            print("left player block!")
+            try:
+                billboard_q.put_nowait("{} blocked!".format(left_player['name']))
+            except queue.Full:
+                pass
             if not muted:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
@@ -481,6 +538,10 @@ while current_mode == MODE_PLAY:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
             score_right += 1
+            try:
+                billboard_q.put_nowait("{} +1".format(right_player['name']))
+            except queue.Full:
+                pass
             playerTurn = RIGHT_PLAYER
             reset_game(playerTurn)
         else:
@@ -492,7 +553,12 @@ while current_mode == MODE_PLAY:
                 LEFT_SOUND.play()
     elif rightPaddle.rect.colliderect(ball.rect):
         if ball.y > rightPaddle.rect.top:
-            print("right player block!")
+            try:
+                billboard_q.put_nowait("{} blocked!".format(right_player['name']))
+            except queue.Full:
+                pass
+            if not muted:
+                FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
             score_left += 1
             playerTurn = LEFT_PLAYER
@@ -503,6 +569,10 @@ while current_mode == MODE_PLAY:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
             score_left += 1
+            try:
+                billboard_q.put_nowait("{} +1".format(left_player['name']))
+            except queue.Full:
+                pass
             playerTurn = LEFT_SOUND
             reset_game(playerTurn)
 
@@ -542,7 +612,5 @@ while current_mode == MODE_PLAY:
 
     pygame.display.update()
     clock.tick(FRAME_RATE)
-
-    frame_cnt += 1
 
 pygame.quit()
