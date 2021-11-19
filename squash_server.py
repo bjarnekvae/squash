@@ -503,7 +503,7 @@ while current_mode == MODE_PLAY:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
             score_left += 1
-            playerTurn = RIGHT_PLAYER
+            playerTurn = LEFT_SOUND
             reset_game(playerTurn)
 
         else:
