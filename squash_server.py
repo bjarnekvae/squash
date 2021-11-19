@@ -28,6 +28,8 @@ left_player['code'] = ''
 right_player = left_player.copy()
 player_mutex = threading.Lock()
 
+server_url = '192.168.1.200'
+
 
 @app.route('/get_frame', methods=['GET'])
 def get_frame():
@@ -121,7 +123,7 @@ def log_out():
     return flask.jsonify(resp)
 
 
-threading.Thread(target=lambda: app.run(host='localhost', port=6010, threaded=True), daemon=True).start()
+threading.Thread(target=lambda: app.run(host=server_url, port=6010, threaded=True), daemon=True).start()
 
 
 ##

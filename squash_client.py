@@ -11,10 +11,11 @@ code = "1222"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
-ctrl_url = "http://localhost:6010/ctrl"
-frame_url = "http://localhost:6010/get_frame"
-loginn_url = "http://localhost:6010/loginn"
-logout_url = "http://localhost:6010/logout"
+server_url = '192.168.1.200'
+ctrl_url = "http://{}:6010/ctrl".format(server_url)
+frame_url = "http://{}:6010/get_frame".format(server_url)
+loginn_url = "http://{}:6010/loginn".format(server_url)
+logout_url = "http://{}:6010/logout".format(server_url)
 
 log_inn = {"name": team_name, "code": code}
 response = requests.put(loginn_url, data=json.dumps(log_inn))
