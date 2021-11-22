@@ -6,8 +6,8 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
-team_name = "Løg"
-code = "1222"
+team_name = "Lg3"
+code = "332"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
@@ -21,7 +21,7 @@ log_inn = {"name": team_name, "code": code}
 response = requests.put(loginn_url, data=json.dumps(log_inn))
 print(response.text)
 
-cmd = {"code": code, "cmd": ""}
+cmd = {"code": code, "cmd": "", "pwr": 1}
 
 try:
     for i in tqdm(range(0, 999999)):
@@ -31,8 +31,9 @@ try:
         cv2.waitKey(1)
 
         cmd["cmd"] = "up_right"
+        cmd["pwr"] = 6
         response = requests.put(ctrl_url, data=json.dumps(cmd))
-        time.sleep(0.001)
+        time.sleep(0.17)
 finally:
     response = requests.put(logout_url, data=json.dumps(log_inn))
     print(response.text)

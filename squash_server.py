@@ -11,6 +11,8 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 import logging
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 logging.getLogger('werkzeug').disabled = True
 
 left_ctrl_q = queue.Queue(1)
@@ -18,6 +20,8 @@ right_ctrl_q = queue.Queue(1)
 billboard_q = queue.Queue(1)
 
 app = flask.Flask(__name__)
+limiter = Limiter(app, key_func=get_remote_address)
+
 frame = None
 frame_mutex = threading.Lock()
 
@@ -30,8 +34,11 @@ player_mutex = threading.Lock()
 
 server_url = '192.168.1.200'
 
+ctrl_limit = "20/second"
+
 
 @app.route('/get_frame', methods=['GET'])
+@limiter.limit(ctrl_limit)
 def get_frame():
     # convert numpy array to PIL Image
     with frame_mutex:
@@ -49,6 +56,7 @@ def get_frame():
     return flask.send_file(file_object, mimetype='image/PNG')
 
 @app.route('/ctrl', methods=['PUT'])
+@limiter.limit(ctrl_limit)
 def get_ctrl():
     client_data = json.loads(flask.request.data)
     #player_ip = flask.request.remote_addr
@@ -70,6 +78,7 @@ def get_ctrl():
     return flask.jsonify(resp)
 
 @app.route('/loginn', methods=['PUT'])
+@limiter.limit("1/second")
 def log_inn():
     client_data = json.loads(flask.request.data)
     #print(flask.request.remote_addr)
@@ -97,6 +106,7 @@ def log_inn():
     return flask.jsonify(resp)
 
 @app.route('/logout', methods=['PUT'])
+@limiter.limit("1/second")
 def log_out():
     client_data = json.loads(flask.request.data)
     resp = dict()
@@ -174,6 +184,7 @@ BALL_INIT_ANGLE = 30
 BALL_RANDOM_BOUNCE = 5
 BALL_PADLE_MAX_BOUNCE = 40
 BALL_RADIUS = 4
+MAX_PADDLE_POWER = 6.01
 PADDLE_SPEED = BALL_INIT_SPEED*0.7
 PADDLE_SIZE = 70
 PADDLE_THICKNESS = 8
@@ -272,6 +283,10 @@ def reset_game(playerTurn):
 ##
 # Game Objects
 #
+
+#f_brightness = thr_lightCtrl.prev + 0.1/led_tau * (brightness - thr_lightCtrl.prev)
+#thr_lightCtrl.prev = f_brightness
+
 class Paddle(pygame.sprite.Sprite):
     def __init__(self, color, width, height, maxX, maxY, x, y):
         pygame.sprite.Sprite.__init__(self)
@@ -359,25 +374,34 @@ while current_mode == MODE_PLAY:
 
         if left_client_req is not None:
             left_cmd = left_client_req['cmd']
+            left_pwr = 0
+            if isinstance(left_client_req['pwr'], float) or isinstance(left_client_req['pwr'], int):
+                if abs(left_client_req['pwr']) <= MAX_PADDLE_POWER:
+                    left_pwr = left_client_req['pwr']
+                else:
+                    print("not in range")
+            else:
+                print("not float")
         else:
             left_cmd = ''
+            left_pwr = 0
 
         if left_cmd == 'up_left':
-            leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+            leftPaddle.move(-PADDLE_SPEED*left_pwr, -PADDLE_SPEED*left_pwr)
         elif left_cmd == 'up_right':
-            leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+            leftPaddle.move(PADDLE_SPEED*left_pwr, -PADDLE_SPEED*left_pwr)
         elif left_cmd == 'down_left':
-            leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+            leftPaddle.move(-PADDLE_SPEED*left_pwr, PADDLE_SPEED*left_pwr)
         elif left_cmd == 'down_right':
-            leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+            leftPaddle.move(PADDLE_SPEED*left_pwr, PADDLE_SPEED*left_pwr)
         elif left_cmd == 'up':
-            leftPaddle.move(0, -PADDLE_SPEED)
+            leftPaddle.move(0, -PADDLE_SPEED*left_pwr)
         elif left_cmd == 'down':
-            leftPaddle.move(0, PADDLE_SPEED)
+            leftPaddle.move(0, PADDLE_SPEED*left_pwr)
         elif left_cmd == 'up_left':
-            leftPaddle.move(-PADDLE_SPEED, 0)
+            leftPaddle.move(-PADDLE_SPEED*left_pwr, 0)
         elif left_cmd == 'down_right':
-            leftPaddle.move(PADDLE_SPEED, 0)
+            leftPaddle.move(PADDLE_SPEED*left_pwr, 0)
 
         right_client_req = None
         try:
@@ -387,25 +411,30 @@ while current_mode == MODE_PLAY:
 
         if right_client_req is not None:
             right_cmd = right_client_req['cmd']
+            right_pwr = 0
+            if isinstance(right_client_req['pwr'], float) or isinstance(right_client_req['pwr'], int):
+                if abs(right_client_req['pwr']) <= MAX_PADDLE_POWER:
+                    right_pwr = right_client_req['pwr']
         else:
             right_cmd = ''
+            right_pwr = 0
 
         if right_cmd == 'up_left':
-            rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+            rightPaddle.move(-PADDLE_SPEED*right_pwr, -PADDLE_SPEED*right_pwr)
         elif right_cmd == 'up_right':
-            rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+            rightPaddle.move(PADDLE_SPEED*right_pwr, -PADDLE_SPEED*right_pwr)
         elif right_cmd == 'down_left':
-            rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+            rightPaddle.move(-PADDLE_SPEED*right_pwr, PADDLE_SPEED*right_pwr)
         elif right_cmd == 'down_right':
-            rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+            rightPaddle.move(PADDLE_SPEED*right_pwr, PADDLE_SPEED*right_pwr)
         elif right_cmd == 'up':
-            rightPaddle.move(0, -PADDLE_SPEED)
+            rightPaddle.move(0, -PADDLE_SPEED*right_pwr)
         elif right_cmd == 'down':
-            rightPaddle.move(0, PADDLE_SPEED)
+            rightPaddle.move(0, PADDLE_SPEED*right_pwr)
         elif right_cmd == 'up_left':
-            rightPaddle.move(-PADDLE_SPEED, 0)
+            rightPaddle.move(-PADDLE_SPEED*right_pwr, 0)
         elif right_cmd == 'down_right':
-            rightPaddle.move(PADDLE_SPEED, 0)
+            rightPaddle.move(PADDLE_SPEED*right_pwr, 0)
     else:
         keysPressed = pygame.key.get_pressed()
         if keysPressed[pygame.K_UP] and keysPressed[pygame.K_LEFT]:
@@ -608,7 +637,7 @@ while current_mode == MODE_PLAY:
     ##
     # Tick-tock
     #
-    if frame_cnt % 4 == 0:
+    if frame_cnt % 5 == 0:
         with frame_mutex:
             frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
 
