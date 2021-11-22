@@ -185,7 +185,7 @@ BALL_RANDOM_BOUNCE = 5
 BALL_PADLE_MAX_BOUNCE = 40
 BALL_RADIUS = 4
 MAX_PADDLE_POWER = 6.01
-PADDLE_SPEED = BALL_INIT_SPEED*0.7
+PADDLE_SPEED = BALL_INIT_SPEED*0.7*6
 PADDLE_SIZE = 70
 PADDLE_THICKNESS = 8
 LEFT_PLAYER = True
@@ -316,7 +316,7 @@ class Paddle(pygame.sprite.Sprite):
             self.x = 0
         elif self.x > self.maxX:
             self.x = self.maxX
-        self.rect.topleft = [self.x, self.y]
+        self.rect.topleft = [int(self.x), int(self.y)]
 
 class Ball(pygame.sprite.Sprite):
     def __init__(self, color, x, y, radius):
@@ -353,123 +353,6 @@ frame_cnt = 0
 billboard_cnt = 0
 text = ''
 while current_mode == MODE_PLAY:
-    ##
-    # Handle keyboard
-    # TODO remove this
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            current_mode = MODE_QUIT
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_q:
-                current_mode = MODE_QUIT
-            elif event.key == pygame.K_m:
-                muted = not muted
-
-    if remote_mode:
-        left_client_req = None
-        try:
-            left_client_req = left_ctrl_q.get_nowait()
-        except queue.Empty:
-            pass
-
-        if left_client_req is not None:
-            left_cmd = left_client_req['cmd']
-            left_pwr = 0
-            if isinstance(left_client_req['pwr'], float) or isinstance(left_client_req['pwr'], int):
-                if abs(left_client_req['pwr']) <= MAX_PADDLE_POWER:
-                    left_pwr = left_client_req['pwr']
-                else:
-                    print("not in range")
-            else:
-                print("not float")
-        else:
-            left_cmd = ''
-            left_pwr = 0
-
-        if left_cmd == 'up_left':
-            leftPaddle.move(-PADDLE_SPEED*left_pwr, -PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'up_right':
-            leftPaddle.move(PADDLE_SPEED*left_pwr, -PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'down_left':
-            leftPaddle.move(-PADDLE_SPEED*left_pwr, PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'down_right':
-            leftPaddle.move(PADDLE_SPEED*left_pwr, PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'up':
-            leftPaddle.move(0, -PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'down':
-            leftPaddle.move(0, PADDLE_SPEED*left_pwr)
-        elif left_cmd == 'up_left':
-            leftPaddle.move(-PADDLE_SPEED*left_pwr, 0)
-        elif left_cmd == 'down_right':
-            leftPaddle.move(PADDLE_SPEED*left_pwr, 0)
-
-        right_client_req = None
-        try:
-            right_client_req = right_ctrl_q.get_nowait()
-        except queue.Empty:
-            pass
-
-        if right_client_req is not None:
-            right_cmd = right_client_req['cmd']
-            right_pwr = 0
-            if isinstance(right_client_req['pwr'], float) or isinstance(right_client_req['pwr'], int):
-                if abs(right_client_req['pwr']) <= MAX_PADDLE_POWER:
-                    right_pwr = right_client_req['pwr']
-        else:
-            right_cmd = ''
-            right_pwr = 0
-
-        if right_cmd == 'up_left':
-            rightPaddle.move(-PADDLE_SPEED*right_pwr, -PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'up_right':
-            rightPaddle.move(PADDLE_SPEED*right_pwr, -PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'down_left':
-            rightPaddle.move(-PADDLE_SPEED*right_pwr, PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'down_right':
-            rightPaddle.move(PADDLE_SPEED*right_pwr, PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'up':
-            rightPaddle.move(0, -PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'down':
-            rightPaddle.move(0, PADDLE_SPEED*right_pwr)
-        elif right_cmd == 'up_left':
-            rightPaddle.move(-PADDLE_SPEED*right_pwr, 0)
-        elif right_cmd == 'down_right':
-            rightPaddle.move(PADDLE_SPEED*right_pwr, 0)
-    else:
-        keysPressed = pygame.key.get_pressed()
-        if keysPressed[pygame.K_UP] and keysPressed[pygame.K_LEFT]:
-            rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_UP] and keysPressed[pygame.K_RIGHT]:
-            rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_LEFT]:
-            rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_RIGHT]:
-            rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-        elif keysPressed[pygame.K_UP]:
-            rightPaddle.move(0, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_DOWN]:
-            rightPaddle.move(0, PADDLE_SPEED)
-        elif keysPressed[pygame.K_LEFT]:
-            rightPaddle.move(-PADDLE_SPEED, 0)
-        elif keysPressed[pygame.K_RIGHT]:
-            rightPaddle.move(PADDLE_SPEED, 0)
-        if keysPressed[pygame.K_w] and keysPressed[pygame.K_a]:
-            leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_w] and keysPressed[pygame.K_d]:
-            leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_a]:
-            leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
-        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_d]:
-            leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
-        elif keysPressed[pygame.K_w]:
-            leftPaddle.move(0, -PADDLE_SPEED)
-        elif keysPressed[pygame.K_s]:
-            leftPaddle.move(0, PADDLE_SPEED)
-        elif keysPressed[pygame.K_a]:
-            leftPaddle.move(-PADDLE_SPEED, 0)
-        elif keysPressed[pygame.K_d]:
-            leftPaddle.move(PADDLE_SPEED, 0)
-
     ##
     # Draw arena, score and player turn color
     #
@@ -510,11 +393,127 @@ while current_mode == MODE_PLAY:
         screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
         pygame.display.update()
         clock.tick(FRAME_RATE)
-        if frame_cnt % 4 == 0:
+        if frame_cnt % 5 == 0:
             with frame_mutex:
                 frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
         continue
 
+        ##
+        # Handle keyboard
+        # TODO remove this
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            current_mode = MODE_QUIT
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_q:
+                current_mode = MODE_QUIT
+            elif event.key == pygame.K_m:
+                muted = not muted
+
+    if remote_mode:
+        left_client_req = None
+        try:
+            left_client_req = left_ctrl_q.get_nowait()
+        except queue.Empty:
+            pass
+
+        if left_client_req is not None:
+            left_cmd = left_client_req['cmd']
+            left_pwr = 0
+            if isinstance(left_client_req['pwr'], int):
+                if 0 <= left_client_req['pwr'] <= MAX_PADDLE_POWER:
+                    left_pwr = int(left_client_req['pwr'])
+                else:
+                    print("not in range")
+            else:
+                print("not float")
+        else:
+            left_cmd = ''
+            left_pwr = 0
+
+        if left_cmd == 'up_left':
+            leftPaddle.move(-PADDLE_SPEED * left_pwr, -PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'up_right':
+            leftPaddle.move(PADDLE_SPEED * left_pwr, -PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'down_left':
+            leftPaddle.move(-PADDLE_SPEED * left_pwr, PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'down_right':
+            leftPaddle.move(PADDLE_SPEED * left_pwr, PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'up':
+            leftPaddle.move(0, -PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'down':
+            leftPaddle.move(0, PADDLE_SPEED * left_pwr)
+        elif left_cmd == 'up_left':
+            leftPaddle.move(-PADDLE_SPEED * left_pwr, 0)
+        elif left_cmd == 'down_right':
+            leftPaddle.move(PADDLE_SPEED * left_pwr, 0)
+
+        right_client_req = None
+        try:
+            right_client_req = right_ctrl_q.get_nowait()
+        except queue.Empty:
+            pass
+
+        if right_client_req is not None:
+            right_cmd = right_client_req['cmd']
+            right_pwr = 0
+            if isinstance(right_client_req['pwr'], float) or isinstance(right_client_req['pwr'], int):
+                if 0 <= right_client_req['pwr'] <= MAX_PADDLE_POWER:
+                    right_pwr = int(right_client_req['pwr'])
+        else:
+            right_cmd = ''
+            right_pwr = 0
+
+        if right_cmd == 'up_left':
+            rightPaddle.move(-PADDLE_SPEED * right_pwr, -PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'up_right':
+            rightPaddle.move(PADDLE_SPEED * right_pwr, -PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'down_left':
+            rightPaddle.move(-PADDLE_SPEED * right_pwr, PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'down_right':
+            rightPaddle.move(PADDLE_SPEED * right_pwr, PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'up':
+            rightPaddle.move(0, -PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'down':
+            rightPaddle.move(0, PADDLE_SPEED * right_pwr)
+        elif right_cmd == 'up_left':
+            rightPaddle.move(-PADDLE_SPEED * right_pwr, 0)
+        elif right_cmd == 'down_right':
+            rightPaddle.move(PADDLE_SPEED * right_pwr, 0)
+    else:
+        keysPressed = pygame.key.get_pressed()
+        if keysPressed[pygame.K_UP] and keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_UP] and keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN] and keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_UP]:
+            rightPaddle.move(0, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_DOWN]:
+            rightPaddle.move(0, PADDLE_SPEED)
+        elif keysPressed[pygame.K_LEFT]:
+            rightPaddle.move(-PADDLE_SPEED, 0)
+        elif keysPressed[pygame.K_RIGHT]:
+            rightPaddle.move(PADDLE_SPEED, 0)
+        if keysPressed[pygame.K_w] and keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_w] and keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_s] and keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, PADDLE_SPEED)
+        elif keysPressed[pygame.K_w]:
+            leftPaddle.move(0, -PADDLE_SPEED)
+        elif keysPressed[pygame.K_s]:
+            leftPaddle.move(0, PADDLE_SPEED)
+        elif keysPressed[pygame.K_a]:
+            leftPaddle.move(-PADDLE_SPEED, 0)
+        elif keysPressed[pygame.K_d]:
+            leftPaddle.move(PADDLE_SPEED, 0)
 
     ##
     # Move ball and update scores
@@ -526,17 +525,19 @@ while current_mode == MODE_PLAY:
             score_right += 1
             try:
                 billboard_q.put_nowait("{} +1".format(right_player['name']))
+                print("ball out")
             except queue.Full:
                 pass
         elif playerTurn == LEFT_PLAYER:
             score_left += 1
             try:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
+                print("ball out")
             except queue.Full:
                 pass
         playerTurn = not playerTurn
         reset_game(playerTurn)
-        pygame.time.delay(LOSE_DELAY)
+        #pygame.time.delay(LOSE_DELAY)
     elif ball.y < 0:
         ball_angle = 180 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
         ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
@@ -556,21 +557,23 @@ while current_mode == MODE_PLAY:
         if ball.y > leftPaddle.rect.top:
             try:
                 billboard_q.put_nowait("{} blocked!".format(left_player['name']))
+                print("block!")
             except queue.Full:
                 pass
             if not muted:
                 FAIL_SOUND.play()
-            pygame.time.delay(LOSE_DELAY)
+            #pygame.time.delay(LOSE_DELAY)
             score_right += 1
             playerTurn = RIGHT_PLAYER
             reset_game(playerTurn)
         elif playerTurn == LEFT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            pygame.time.delay(LOSE_DELAY)
+            #pygame.time.delay(LOSE_DELAY)
             score_right += 1
             try:
                 billboard_q.put_nowait("{} +1".format(right_player['name']))
+                print("not your turn!")
             except queue.Full:
                 pass
             playerTurn = RIGHT_PLAYER
@@ -586,11 +589,12 @@ while current_mode == MODE_PLAY:
         if ball.y > rightPaddle.rect.top:
             try:
                 billboard_q.put_nowait("{} blocked!".format(right_player['name']))
+                print("block!")
             except queue.Full:
                 pass
             if not muted:
                 FAIL_SOUND.play()
-            pygame.time.delay(LOSE_DELAY)
+            #pygame.time.delay(LOSE_DELAY)
             score_left += 1
             playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
@@ -598,10 +602,11 @@ while current_mode == MODE_PLAY:
         elif playerTurn == RIGHT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            pygame.time.delay(LOSE_DELAY)
+            #pygame.time.delay(LOSE_DELAY)
             score_left += 1
             try:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
+                print("not your turn!")
             except queue.Full:
                 pass
             playerTurn = LEFT_SOUND

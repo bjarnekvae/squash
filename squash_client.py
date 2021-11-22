@@ -6,8 +6,8 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
-team_name = "Lg3"
-code = "332"
+team_name = "Lgfw23"
+code = "32f3"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
@@ -31,7 +31,7 @@ try:
         cv2.waitKey(1)
 
         cmd["cmd"] = "up_right"
-        cmd["pwr"] = 6
+        cmd["pwr"] = 3
         response = requests.put(ctrl_url, data=json.dumps(cmd))
         time.sleep(0.17)
 finally:
