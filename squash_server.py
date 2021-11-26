@@ -29,12 +29,13 @@ left_player = dict()
 left_player['ip'] = ''
 left_player['name'] = ''
 left_player['code'] = ''
+left_player['score'] = 0
 right_player = left_player.copy()
 player_mutex = threading.Lock()
 
 server_url = '192.168.1.200'
 
-ctrl_limit = "20/second"
+ctrl_limit = "40/second"
 
 
 @app.route('/get_frame', methods=['GET'])
@@ -54,6 +55,7 @@ def get_frame():
     file_object.seek(0)
 
     return flask.send_file(file_object, mimetype='image/PNG')
+
 
 @app.route('/ctrl', methods=['PUT'])
 @limiter.limit(ctrl_limit)
@@ -76,6 +78,7 @@ def get_ctrl():
         resp['status'] = "Too fast!"
 
     return flask.jsonify(resp)
+
 
 @app.route('/loginn', methods=['PUT'])
 @limiter.limit("1/second")
@@ -105,6 +108,7 @@ def log_inn():
 
     return flask.jsonify(resp)
 
+
 @app.route('/logout', methods=['PUT'])
 @limiter.limit("1/second")
 def log_out():
@@ -123,6 +127,10 @@ def log_out():
             right_player['code'] = ''
             right_player['name'] = ''
             resp['status'] = "OK"
+
+        print("Left: {}, Right {}".format(left_player['score'], right_player['score']))
+        left_player['score'] = 0
+        right_player['score'] = 0
 
         if resp['status'] is not "Not logged inn":
             try:
@@ -184,15 +192,13 @@ BALL_INIT_ANGLE = 30
 BALL_RANDOM_BOUNCE = 5
 BALL_PADLE_MAX_BOUNCE = 40
 BALL_RADIUS = 4
-MAX_PADDLE_POWER = 6.01
-PADDLE_SPEED = BALL_INIT_SPEED*0.7*6
+MAX_PADDLE_POWER = 1.0001
+PADDLE_SPEED = BALL_INIT_SPEED*0.7
 PADDLE_SIZE = 70
 PADDLE_THICKNESS = 8
 LEFT_PLAYER = True
 RIGHT_PLAYER = False
 muted = False
-score_left = 0
-score_right = 0
 playerTurn = LEFT_PLAYER
 current_mode = MODE_PLAY
 remote_mode = True
@@ -263,7 +269,7 @@ def is_under(main_rect, sec_rect):
 # Action on player score
 #
 def reset_game(playerTurn):
-    global score_left, score_right, leftPaddle, rightPaddle, ball, ball_vector, ball_angle
+    global leftPaddle, rightPaddle, ball, ball_vector, ball_angle
     if playerTurn == RIGHT_PLAYER:
         leftPaddle.x = WIDTH/4 - PADDLE_SIZE/2
         leftPaddle.y = HEIGHT - PADDLE_THICKNESS
@@ -352,6 +358,11 @@ spriteGroup.add(ball)
 frame_cnt = 0
 billboard_cnt = 0
 text = ''
+left_cmd = ''
+left_pwr = 0
+right_cmd = ''
+right_pwr = 0
+
 while current_mode == MODE_PLAY:
     ##
     # Draw arena, score and player turn color
@@ -365,7 +376,7 @@ while current_mode == MODE_PLAY:
         pygame.draw.line(screen, leftPaddle.color, [int(WIDTH/16*2), 28], [int(WIDTH/16*6), 28], 3)
     else:
         pygame.draw.line(screen, rightPaddle.color, [int(WIDTH/16*10), 28], [int(WIDTH/16*14), 28], 3)
-    score_text = FONT.render("{}:{}".format(str(score_left), str(score_right)), 1, GRAY)
+    score_text = FONT.render("{}:{}".format(str(left_player['score']), str(right_player['score'])), 1, GRAY)
     left_name_text = FONT.render(left_player['name'][:10], 1, leftPaddle.color)
     right_name_text = FONT.render(right_player['name'][:10], 1, rightPaddle.color)
     screen.blit(score_text, score_text.get_rect(centerx=WIDTH / 2))
@@ -375,7 +386,6 @@ while current_mode == MODE_PLAY:
     try:
         text = billboard_q.get_nowait()
         billboard_cnt = frame_cnt
-        print(text)
     except queue.Empty:
         pass
 
@@ -400,7 +410,6 @@ while current_mode == MODE_PLAY:
 
         ##
         # Handle keyboard
-        # TODO remove this
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             current_mode = MODE_QUIT
@@ -418,18 +427,11 @@ while current_mode == MODE_PLAY:
             pass
 
         if left_client_req is not None:
-            left_cmd = left_client_req['cmd']
+            left_cmd = left_client_req['direction']
             left_pwr = 0
-            if isinstance(left_client_req['pwr'], int):
-                if 0 <= left_client_req['pwr'] <= MAX_PADDLE_POWER:
-                    left_pwr = int(left_client_req['pwr'])
-                else:
-                    print("not in range")
-            else:
-                print("not float")
-        else:
-            left_cmd = ''
-            left_pwr = 0
+            if isinstance(left_client_req['speed'], float):
+                if 0 <= left_client_req['speed'] <= MAX_PADDLE_POWER:
+                    left_pwr = float(left_client_req['speed'])
 
         if left_cmd == 'up_left':
             leftPaddle.move(-PADDLE_SPEED * left_pwr, -PADDLE_SPEED * left_pwr)
@@ -443,9 +445,9 @@ while current_mode == MODE_PLAY:
             leftPaddle.move(0, -PADDLE_SPEED * left_pwr)
         elif left_cmd == 'down':
             leftPaddle.move(0, PADDLE_SPEED * left_pwr)
-        elif left_cmd == 'up_left':
+        elif left_cmd == 'left':
             leftPaddle.move(-PADDLE_SPEED * left_pwr, 0)
-        elif left_cmd == 'down_right':
+        elif left_cmd == 'right':
             leftPaddle.move(PADDLE_SPEED * left_pwr, 0)
 
         right_client_req = None
@@ -455,14 +457,12 @@ while current_mode == MODE_PLAY:
             pass
 
         if right_client_req is not None:
-            right_cmd = right_client_req['cmd']
+            right_cmd = right_client_req['direction']
             right_pwr = 0
-            if isinstance(right_client_req['pwr'], float) or isinstance(right_client_req['pwr'], int):
-                if 0 <= right_client_req['pwr'] <= MAX_PADDLE_POWER:
-                    right_pwr = int(right_client_req['pwr'])
-        else:
-            right_cmd = ''
-            right_pwr = 0
+            if isinstance(right_client_req['speed'], float):
+                if 0 <= right_client_req['speed'] <= MAX_PADDLE_POWER:
+                    right_pwr = float(right_client_req['speed'])
+
 
         if right_cmd == 'up_left':
             rightPaddle.move(-PADDLE_SPEED * right_pwr, -PADDLE_SPEED * right_pwr)
@@ -476,9 +476,9 @@ while current_mode == MODE_PLAY:
             rightPaddle.move(0, -PADDLE_SPEED * right_pwr)
         elif right_cmd == 'down':
             rightPaddle.move(0, PADDLE_SPEED * right_pwr)
-        elif right_cmd == 'up_left':
+        elif right_cmd == 'left':
             rightPaddle.move(-PADDLE_SPEED * right_pwr, 0)
-        elif right_cmd == 'down_right':
+        elif right_cmd == 'right':
             rightPaddle.move(PADDLE_SPEED * right_pwr, 0)
     else:
         keysPressed = pygame.key.get_pressed()
@@ -522,22 +522,20 @@ while current_mode == MODE_PLAY:
         if not muted:
             LOSE_SOUND.play()
         if playerTurn == RIGHT_PLAYER:
-            score_right += 1
+            right_player['score'] += 1
             try:
                 billboard_q.put_nowait("{} +1".format(right_player['name']))
-                print("ball out")
             except queue.Full:
                 pass
         elif playerTurn == LEFT_PLAYER:
-            score_left += 1
+            left_player['score'] += 1
             try:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
-                print("ball out")
             except queue.Full:
                 pass
         playerTurn = not playerTurn
         reset_game(playerTurn)
-        #pygame.time.delay(LOSE_DELAY)
+        pygame.time.delay(LOSE_DELAY)
     elif ball.y < 0:
         ball_angle = 180 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
         ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
@@ -557,23 +555,21 @@ while current_mode == MODE_PLAY:
         if ball.y > leftPaddle.rect.top:
             try:
                 billboard_q.put_nowait("{} blocked!".format(left_player['name']))
-                print("block!")
             except queue.Full:
                 pass
             if not muted:
                 FAIL_SOUND.play()
-            #pygame.time.delay(LOSE_DELAY)
-            score_right += 1
+            pygame.time.delay(LOSE_DELAY)
+            right_player['score'] += 1
             playerTurn = RIGHT_PLAYER
             reset_game(playerTurn)
         elif playerTurn == LEFT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            #pygame.time.delay(LOSE_DELAY)
-            score_right += 1
+            pygame.time.delay(LOSE_DELAY)
+            right_player['score'] += 1
             try:
                 billboard_q.put_nowait("{} +1".format(right_player['name']))
-                print("not your turn!")
             except queue.Full:
                 pass
             playerTurn = RIGHT_PLAYER
@@ -589,24 +585,22 @@ while current_mode == MODE_PLAY:
         if ball.y > rightPaddle.rect.top:
             try:
                 billboard_q.put_nowait("{} blocked!".format(right_player['name']))
-                print("block!")
             except queue.Full:
                 pass
             if not muted:
                 FAIL_SOUND.play()
-            #pygame.time.delay(LOSE_DELAY)
-            score_left += 1
+            pygame.time.delay(LOSE_DELAY)
+            left_player['score'] += 1
             playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
 
         elif playerTurn == RIGHT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
-            #pygame.time.delay(LOSE_DELAY)
-            score_left += 1
+            pygame.time.delay(LOSE_DELAY)
+            left_player['score'] += 1
             try:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
-                print("not your turn!")
             except queue.Full:
                 pass
             playerTurn = LEFT_SOUND

@@ -6,8 +6,8 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
-team_name = "Lgfw23"
-code = "32f3"
+team_name = "Lgwwfe223ee23"
+code = "eee3wee"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
@@ -21,19 +21,29 @@ log_inn = {"name": team_name, "code": code}
 response = requests.put(loginn_url, data=json.dumps(log_inn))
 print(response.text)
 
-cmd = {"code": code, "cmd": "", "pwr": 1}
+cmd = {"code": code, "direction": "", "speed": 0.5}
 
 try:
     for i in tqdm(range(0, 999999)):
         response = requests.get(frame_url)
         img_arr = misc.imread(BytesIO(response.content))
+        img_arr = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)
         cv2.imshow("img", img_arr)
         cv2.waitKey(1)
 
-        cmd["cmd"] = "up_right"
-        cmd["pwr"] = 3
-        response = requests.put(ctrl_url, data=json.dumps(cmd))
-        time.sleep(0.17)
+        if i % 20 == 0:
+            cmd["direction"] = "right"
+            cmd["speed"] = 1.0
+            response = requests.put(ctrl_url, data=json.dumps(cmd))
+            print("right")
+
+        if (i+10) % 20 == 0:
+            cmd["direction"] = "left"
+            cmd["speed"] = 0.9
+            response = requests.put(ctrl_url, data=json.dumps(cmd))
+            print("left")
+
+        time.sleep(0.05)
 finally:
     response = requests.put(logout_url, data=json.dumps(log_inn))
     print(response.text)
