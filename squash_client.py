@@ -6,8 +6,8 @@ import cv2
 from io import BytesIO
 from tqdm import tqdm
 
-team_name = "Lgwwfe223ee23"
-code = "eee3wee"
+team_name = "Lg223ee23"
+code = "eeeee"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 

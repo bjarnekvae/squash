@@ -17,7 +17,7 @@ logging.getLogger('werkzeug').disabled = True
 
 left_ctrl_q = queue.Queue(1)
 right_ctrl_q = queue.Queue(1)
-billboard_q = queue.Queue(1)
+billboard_q = queue.Queue(5)
 
 app = flask.Flask(__name__)
 limiter = Limiter(app, key_func=get_remote_address)
@@ -25,6 +25,8 @@ limiter = Limiter(app, key_func=get_remote_address)
 frame = None
 frame_mutex = threading.Lock()
 
+
+remote_mode = False
 left_player = dict()
 left_player['ip'] = ''
 left_player['name'] = ''
@@ -203,7 +205,6 @@ RIGHT_PLAYER = False
 muted = False
 playerTurn = RIGHT_PLAYER
 current_mode = MODE_PLAY
-remote_mode = False
 BILLBOARD_TEXT_VISIBLE = FRAME_RATE*1.5
 
 def rotation_matrix(theta):
@@ -421,11 +422,12 @@ while current_mode == MODE_PLAY:
     screen.blit(left_name_text, left_name_text.get_rect(centerx=WIDTH / 4))
     screen.blit(right_name_text, right_name_text.get_rect(centerx=WIDTH / 4*3))
 
-    try:
-        text = billboard_q.get_nowait()
-        billboard_cnt = frame_cnt
-    except queue.Empty:
-        pass
+    if text == '':
+        try:
+            text = billboard_q.get_nowait()
+            billboard_cnt = frame_cnt
+        except queue.Empty:
+            pass
 
     if frame_cnt < billboard_cnt+BILLBOARD_TEXT_VISIBLE:
         billboard_text = FONT.render(text, 1, RED)
@@ -559,12 +561,20 @@ while current_mode == MODE_PLAY:
     diff_cnt += 1
 
     if diff_cnt % (FRAME_RATE*60) == 0:
-        paddle_size = paddle_size*0.9
+        paddle_size = paddle_size*0.8
         leftPaddle.change_width(paddle_size)
         rightPaddle.change_width(paddle_size)
+        try:
+            billboard_q.put_nowait("Paddle size: -20%")
+        except queue.Full:
+            pass
 
-    if diff_cnt % (FRAME_RATE*60) == 0:
+    if diff_cnt % (FRAME_RATE*30) == 0:
         BALL_INIT_SPEED *= 1.1
+        try:
+            billboard_q.put_nowait("Ball velocity: +10%")
+        except queue.Full:
+            pass
 
 
 
@@ -730,6 +740,7 @@ while current_mode == MODE_PLAY:
                 print("{} won! {} - {}".format(left_player['name'], left_player['score'], right_player['score']))
             else:
                 print("{} won! {} - {}".format(right_player['name'], left_player['score'], right_player['score']))
+            pygame.time.delay(LOSE_DELAY)
             pygame.quit()
 
 
