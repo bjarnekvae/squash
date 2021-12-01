@@ -201,7 +201,7 @@ RIGHT_PLAYER = False
 muted = False
 playerTurn = LEFT_PLAYER
 current_mode = MODE_PLAY
-remote_mode = True
+remote_mode = False
 BILLBOARD_TEXT_VISIBLE = FRAME_RATE*1.5
 
 def rotation_matrix(theta):
@@ -283,7 +283,7 @@ def reset_game(playerTurn):
         rightPaddle.y = HEIGHT - PADDLE_THICKNESS
         ball.x = WIDTH/4
     ball.y = HEIGHT/4 * 3 - PADDLE_THICKNESS - 2 * BALL_RADIUS
-    ball_angle = np.random.uniform(-20, 20)
+    ball_angle = np.random.uniform(-25, 25)
     ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
 
 ##
@@ -397,7 +397,7 @@ while current_mode == MODE_PLAY:
 
     frame_cnt += 1
 
-    if (left_player['name'] == '' or right_player['name'] == ''): ## TODO add remote mode exception
+    if (left_player['name'] == '' or right_player['name'] == '') and remote_mode:
         wait_text = "Wating for players..."
         billboard_text = FONT.render(wait_text, 1, RED)
         screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
