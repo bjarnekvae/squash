@@ -186,16 +186,17 @@ RIGHT_SOUND = pygame.mixer.Sound('beep-8.wav')
 ##
 # Game Vars
 #
-BUDGE = 5
-BALL_INIT_SPEED = 3
+PADDLE_TAU = 0.15
+BUDGE = 12
+BALL_INIT_SPEED = 2
 BALL_INIT_ANGLE = 30
 BALL_RANDOM_BOUNCE = 5
 BALL_PADLE_MAX_BOUNCE = 40
 BALL_RADIUS = 4
 MAX_PADDLE_POWER = 1.0001
-PADDLE_SPEED = BALL_INIT_SPEED*0.7
+PADDLE_SPEED = BALL_INIT_SPEED*0.9
 PADDLE_SIZE = 70
-PADDLE_THICKNESS = 8
+PADDLE_THICKNESS = 12
 LEFT_PLAYER = True
 RIGHT_PLAYER = False
 muted = False
@@ -290,9 +291,6 @@ def reset_game(playerTurn):
 # Game Objects
 #
 
-#f_brightness = thr_lightCtrl.prev + 0.1/led_tau * (brightness - thr_lightCtrl.prev)
-#thr_lightCtrl.prev = f_brightness
-
 class Paddle(pygame.sprite.Sprite):
     def __init__(self, color, width, height, maxX, maxY, x, y):
         pygame.sprite.Sprite.__init__(self)
@@ -308,21 +306,39 @@ class Paddle(pygame.sprite.Sprite):
         self.maxY = maxY
         self.x = x
         self.y = y
+        self.prev_x = x
+        self.prev_y = y
 
     def move(self, moveX, moveY):
         self.y = self.y + moveY
         self.x = self.x + moveX
 
+    def change_width(self, width):
+        self.width = width
+        self.image = pygame.Surface([self.width, self.height])
+        self.image.fill(self.color)
+        self.rect = self.image.get_rect()
+        self.rect.x = self.x
+        self.rect.y = self.y
+        self.maxX = WIDTH - width
+
     def update(self):
-        if self.y < self.maxY/2:
-            self.y = self.maxY/2
-        elif self.y > self.maxY:
-            self.y = self.maxY
-        if self.x < 0:
-            self.x = 0
-        elif self.x > self.maxX:
-            self.x = self.maxX
-        self.rect.topleft = [int(self.x), int(self.y)]
+        f_x = self.prev_x + (1/FRAME_RATE)/PADDLE_TAU * (self.x - self.prev_x)
+        f_y = self.prev_y + (1/FRAME_RATE)/PADDLE_TAU * (self.y - self.prev_y)
+
+        if f_y < self.maxY/2:
+            f_y = self.maxY/2
+        elif f_y > self.maxY:
+            f_y = self.maxY
+        if f_x < 0:
+            f_x = 0
+        elif f_x > self.maxX:
+            f_x = self.maxX
+
+        self.prev_x = f_x
+        self.prev_y = f_y
+
+        self.rect.topleft = [int(f_x), int(f_y)]
 
 class Ball(pygame.sprite.Sprite):
     def __init__(self, color, x, y, radius):
@@ -356,12 +372,14 @@ spriteGroup.add(ball)
 # Game loop
 #
 frame_cnt = 0
+diff_cnt = 0
 billboard_cnt = 0
 text = ''
 left_cmd = ''
 left_pwr = 0
 right_cmd = ''
 right_pwr = 0
+paddle_size = PADDLE_SIZE
 
 while current_mode == MODE_PLAY:
     ##
@@ -408,8 +426,8 @@ while current_mode == MODE_PLAY:
                 frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
         continue
 
-        ##
-        # Handle keyboard
+    ##
+    # Handle keyboard
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             current_mode = MODE_QUIT
@@ -516,6 +534,16 @@ while current_mode == MODE_PLAY:
             leftPaddle.move(PADDLE_SPEED, 0)
 
     ##
+    # Increase difficulty
+    #
+    diff_cnt += 1
+
+    if diff_cnt % (FRAME_RATE*60) == 0:
+        paddle_size = paddle_size*0.9
+        leftPaddle.change_width(paddle_size)
+        rightPaddle.change_width(paddle_size)
+
+    ##
     # Move ball and update scores
     #
     if ball.y > HEIGHT:
@@ -576,7 +604,7 @@ while current_mode == MODE_PLAY:
             reset_game(playerTurn)
         else:
             ball.y = leftPaddle.y - 2 * BALL_RADIUS
-            ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
+            ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
             ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
             playerTurn = not playerTurn
             if not muted:
@@ -593,7 +621,6 @@ while current_mode == MODE_PLAY:
             left_player['score'] += 1
             playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
-
         elif playerTurn == RIGHT_PLAYER:
             if not muted:
                 FAIL_SOUND.play()
@@ -603,12 +630,11 @@ while current_mode == MODE_PLAY:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
             except queue.Full:
                 pass
-            playerTurn = LEFT_SOUND
+            playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
-
         else:
             ball.y = rightPaddle.y - 2 * BALL_RADIUS
-            ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(PADDLE_SIZE/2)*BALL_PADLE_MAX_BOUNCE
+            ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
             ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
             playerTurn = not playerTurn
             if not muted:
