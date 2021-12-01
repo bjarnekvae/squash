@@ -143,7 +143,6 @@ def log_out():
 
 threading.Thread(target=lambda: app.run(host=server_url, port=6010, threaded=True), daemon=True).start()
 
-
 ##
 # Game mode
 #
@@ -175,7 +174,7 @@ FRAME_RATE = 120
 ##
 # Game Sounds and delay for losing
 #
-LOSE_DELAY = 500
+LOSE_DELAY = 2000
 LOSE_SOUND = pygame.mixer.Sound('beep-2.wav')
 FAIL_SOUND = pygame.mixer.Sound('beep-3.wav')
 LEFT_SOUND = pygame.mixer.Sound('beep-7.wav')
@@ -190,13 +189,13 @@ PADDLE_TAU = 0.15
 BUDGE = 12
 BALL_INIT_SPEED = 2
 BALL_INIT_ANGLE = 30
-BALL_BOUNCE_DECAY = 0.01
-BALL_DECAY_RATE = 0.1/FRAME_RATE
+BALL_BOUNCE_DECAY = 0.15
+BALL_DECAY_RATE = 0.08/FRAME_RATE
 BALL_RANDOM_BOUNCE = 5
-BALL_PADLE_MAX_BOUNCE = 40
+BALL_PADLE_MAX_BOUNCE = 25
 BALL_RADIUS = 4
 MAX_PADDLE_POWER = 1.0001
-PADDLE_SPEED = BALL_INIT_SPEED*0.9
+PADDLE_SPEED = BALL_INIT_SPEED*0.8
 PADDLE_SIZE = 70
 PADDLE_THICKNESS = 12
 LEFT_PLAYER = True
@@ -217,7 +216,7 @@ def rotation_matrix(theta):
     return matrix
 
 ball_angle = BALL_INIT_ANGLE
-ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED*1.5])
 
 def is_toright(main_rect, sec_rect):
     x1 = main_rect[0]
@@ -322,7 +321,7 @@ class Paddle(pygame.sprite.Sprite):
         f_x = self.prev_x + (1/FRAME_RATE)/PADDLE_TAU * (self.inp_x - self.prev_x)
         f_y = self.prev_y + (1/FRAME_RATE)/PADDLE_TAU * (self.inp_y - self.prev_y)
 
-        self.y_velocity = f_y - self.prev_y
+        self.y_velocity = self.prev_y - f_y
         self.prev_x = f_x
         self.prev_y = f_y
         self.x = f_x
@@ -362,9 +361,9 @@ spriteGroup.add(ball)
 # Action on player score
 #
 paddle_size = PADDLE_SIZE
-ball_speed = BALL_INIT_SPEED
+ball_velocity = BALL_INIT_SPEED
 def reset_game(playerTurn):
-    global ball_vector, ball_angle, leftPaddle, rightPaddle
+    global ball_vector, ball_angle, leftPaddle, rightPaddle, ball_velocity
     if playerTurn == LEFT_PLAYER:
         left_x = WIDTH/4 - paddle_size/2
         left_y = HEIGHT - PADDLE_THICKNESS
@@ -382,7 +381,8 @@ def reset_game(playerTurn):
     rightPaddle.set_xy(right_x, right_y)
     ball.y = HEIGHT/4 * 3 - PADDLE_THICKNESS - 2 * BALL_RADIUS
     ball_angle = np.random.uniform(-25, 25)
-    ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+    ball_velocity = BALL_INIT_SPEED
+    ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED*1.5])
 
 
 ##
@@ -436,7 +436,7 @@ while current_mode == MODE_PLAY:
     frame_cnt += 1
 
     if (left_player['name'] == '' or right_player['name'] == ''):
-        wait_text = "Wating for players..."
+        wait_text = "Waiting for players..."
         billboard_text = FONT.render(wait_text, 1, RED)
         screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
         pygame.display.update()
@@ -563,6 +563,12 @@ while current_mode == MODE_PLAY:
         leftPaddle.change_width(paddle_size)
         rightPaddle.change_width(paddle_size)
 
+    if diff_cnt % (FRAME_RATE*60) == 0:
+        BALL_INIT_SPEED *= 1.1
+
+
+
+
     ##
     # Move ball and update scores
     #
@@ -575,28 +581,54 @@ while current_mode == MODE_PLAY:
                 billboard_q.put_nowait("{} +1".format(right_player['name']))
             except queue.Full:
                 pass
-            playerTurn = RIGHT_PLAYER
+            playerTurn = LEFT_PLAYER
         elif playerTurn == LEFT_PLAYER:
             right_player['score'] += 1
             try:
                 billboard_q.put_nowait("{} +1".format(left_player['name']))
             except queue.Full:
                 pass
-            playerTurn = LEFT_PLAYER
+            playerTurn = RIGHT_PLAYER
         reset_game(playerTurn)
         pygame.time.delay(LOSE_DELAY)
     elif ball.y < 0:
         ball_angle = 180 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
-        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+        ball_velocity *= (1.0 - BALL_BOUNCE_DECAY)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
+        ball.y = 5
     if ball.x > WIDTH:
         ball_angle = 360 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
-        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+        ball_velocity *= (1.0 - BALL_BOUNCE_DECAY)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
+        ball.x = WIDTH - 5
     elif ball.x < 0:
         ball_angle = 360 - ball_angle + np.random.uniform(-BALL_RANDOM_BOUNCE, BALL_RANDOM_BOUNCE)
-        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+        ball_velocity *= (1.0 - BALL_BOUNCE_DECAY)
+        ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
+        ball.x = 5
 
+
+    ball_vector = ball_vector*(1.0 - BALL_DECAY_RATE)
+    ball_velocity = np.linalg.norm(ball_vector)
     ball.y = ball.y + ball_vector[1]
     ball.x = ball.x + ball_vector[0]
+
+    if ball_velocity < 0.5:
+        pygame.time.delay(LOSE_DELAY)
+        if ball.rect.center[1] < HEIGHT/2:
+            if playerTurn is not LEFT_PLAYER:
+                right_player['score'] += 1
+            elif playerTurn is not RIGHT_PLAYER:
+                left_player['score'] += 1
+            reset_game(playerTurn)
+        elif ball.rect.center[1] >= HEIGHT/2:
+            if playerTurn is LEFT_PLAYER:
+                right_player['score'] += 1
+            elif playerTurn is RIGHT_PLAYER:
+                left_player['score'] += 1
+            reset_game(playerTurn)
+
+
     ##
     # Bounce ball off paddles and paddles off each other
     #
@@ -624,9 +656,10 @@ while current_mode == MODE_PLAY:
             playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
         else:
-            ball.y = leftPaddle.y - BALL_RADIUS*4
+            ball.y = leftPaddle.rect.top - BALL_RADIUS*4
             ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
-            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+            ball_velocity = BALL_INIT_SPEED + leftPaddle.y_velocity
+            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
             playerTurn = RIGHT_PLAYER
             if not muted:
                 LEFT_SOUND.play()
@@ -654,9 +687,10 @@ while current_mode == MODE_PLAY:
             playerTurn = RIGHT_PLAYER
             reset_game(playerTurn)
         else:
-            ball.y = rightPaddle.y - BALL_RADIUS*4
+            ball.y = rightPaddle.rect.top - BALL_RADIUS*4
             ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
-            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -BALL_INIT_SPEED])
+            ball_velocity = BALL_INIT_SPEED + rightPaddle.y_velocity
+            ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
             playerTurn = LEFT_PLAYER
             if not muted:
                 RIGHT_SOUND.play()
@@ -690,4 +724,12 @@ while current_mode == MODE_PLAY:
     pygame.display.update()
     clock.tick(FRAME_RATE)
 
-pygame.quit()
+    if (left_player['score'] >= 10 or right_player['score'] >= 10):
+        if abs(left_player['score'] - right_player['score']) > 1:
+            if left_player['score'] > right_player['score']:
+                print("{} won! {} - {}".format(left_player['name'], left_player['score'], right_player['score']))
+            else:
+                print("{} won! {} - {}".format(right_player['name'], left_player['score'], right_player['score']))
+            pygame.quit()
+
+
