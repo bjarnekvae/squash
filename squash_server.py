@@ -658,7 +658,7 @@ while current_mode == MODE_PLAY:
         else:
             ball.y = leftPaddle.rect.top - BALL_RADIUS*4
             ball_angle = 180 - ball_angle + (ball.x - leftPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
-            ball_velocity = BALL_INIT_SPEED + leftPaddle.y_velocity
+            ball_velocity = BALL_INIT_SPEED + leftPaddle.y_velocity*np.random.uniform(0.8, 1.2)
             ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
             playerTurn = RIGHT_PLAYER
             if not muted:
@@ -689,7 +689,7 @@ while current_mode == MODE_PLAY:
         else:
             ball.y = rightPaddle.rect.top - BALL_RADIUS*4
             ball_angle = 180 - ball_angle + (ball.x - rightPaddle.rect.center[0])/(paddle_size/2)*BALL_PADLE_MAX_BOUNCE
-            ball_velocity = BALL_INIT_SPEED + rightPaddle.y_velocity
+            ball_velocity = BALL_INIT_SPEED + rightPaddle.y_velocity*np.random.uniform(0.8, 1.2)
             ball_vector = rotation_matrix(ball_angle) @ np.array([0, -ball_velocity])
             playerTurn = LEFT_PLAYER
             if not muted:
