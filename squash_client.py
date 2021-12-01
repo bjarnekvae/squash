@@ -4,14 +4,22 @@ import json
 from scipy import misc
 import cv2
 from io import BytesIO
-from tqdm import tqdm
 
-team_name = "Lg223ee23"
-code = "eeeee"
+# README:
+# - All requests must contain a code
+# - Requests are limited to 20 Hz
+# - Control input is paddle speed
+#
+# Possible directions:
+# 'up', 'down', 'left', 'right', 'up_left', 'up_right', 'down_left', 'down_right' or ''
+# speed = 0 - 1 (float)
+
+team_name = "team_name"
+code = "1234"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
-server_url = '192.168.1.200'
+server_url = '192.168.1.200'  # <- must be changed to server IP
 ctrl_url = "http://{}:6010/ctrl".format(server_url)
 frame_url = "http://{}:6010/get_frame".format(server_url)
 loginn_url = "http://{}:6010/loginn".format(server_url)
@@ -22,9 +30,9 @@ response = requests.put(loginn_url, data=json.dumps(log_inn))
 print(response.text)
 
 cmd = {"code": code, "direction": "", "speed": 0.5}
-
+i = 0
 try:
-    for i in tqdm(range(0, 999999)):
+    while True:
         response = requests.get(frame_url)
         img_arr = misc.imread(BytesIO(response.content))
         img_arr = cv2.cvtColor(img_arr, cv2.COLOR_RGB2BGR)

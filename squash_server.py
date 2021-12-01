@@ -13,7 +13,24 @@ from io import BytesIO
 import logging
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from glob import glob
+import datetime
 logging.getLogger('werkzeug').disabled = True
+np.random.seed(datetime.datetime.now().microsecond)
+
+rescale_trump = 160
+d_trumps = glob("trump/*.png")
+trump_heads = []
+for d_trump in d_trumps:
+    trump_head = pygame.image.load(d_trump)
+    height = trump_head.get_height()
+    width = trump_head.get_width()
+    ratio = rescale_trump/height
+
+    trump_head = pygame.transform.scale(trump_head, (rescale_trump, int(ratio*width)))
+    trump_heads.append(trump_head)
+
+n_trumps = len(trump_heads)
 
 left_ctrl_q = queue.Queue(1)
 right_ctrl_q = queue.Queue(1)
@@ -181,8 +198,6 @@ LOSE_SOUND = pygame.mixer.Sound('beep-2.wav')
 FAIL_SOUND = pygame.mixer.Sound('beep-3.wav')
 LEFT_SOUND = pygame.mixer.Sound('beep-7.wav')
 RIGHT_SOUND = pygame.mixer.Sound('beep-8.wav')
-#LEFT_SOUND = pygame.mixer.Sound('beep-21.wav') #--too quiet!
-#RIGHT_SOUND = pygame.mixer.Sound('beep-22.wav')
 
 ##
 # Game Vars
@@ -200,6 +215,7 @@ MAX_PADDLE_POWER = 1.0001
 PADDLE_SPEED = BALL_INIT_SPEED*0.8
 PADDLE_SIZE = 70
 PADDLE_THICKNESS = 12
+PROB_TRUMP = 0.2 # A 20% chance for a Trump visit every 10 seconds
 LEFT_PLAYER = True
 RIGHT_PLAYER = False
 muted = False
@@ -398,6 +414,11 @@ left_pwr = 0
 right_cmd = ''
 right_pwr = 0
 
+trmp_line = [-rescale_trump, 0, WIDTH, 0]
+trmp_delta = 0
+trmp_img = 0
+trmp_visit = False
+
 if not remote_mode:
     left_player['name'] = 'left'
     right_player['name'] = 'right'
@@ -422,7 +443,20 @@ while current_mode == MODE_PLAY:
     screen.blit(left_name_text, left_name_text.get_rect(centerx=WIDTH / 4))
     screen.blit(right_name_text, right_name_text.get_rect(centerx=WIDTH / 4*3))
 
+    if trmp_visit:
+        trmp_visit = False
+        trmp_line[1] = np.random.uniform(0, HEIGHT)
+        trmp_line[3] = np.random.uniform(0, HEIGHT)
+        trmp_img = int(np.random.uniform(0, n_trumps))
+        trmp_delta = frame_cnt
+
+    x = frame_cnt - trmp_delta - rescale_trump
+    if (x > -rescale_trump and x < WIDTH) and frame_cnt > HEIGHT:
+        y = (trmp_line[3] - trmp_line[1]) / (trmp_line[2] - trmp_line[0]) * (x - trmp_line[0]) + trmp_line[1]
+        screen.blit(trump_heads[trmp_img], [x, y])
+
     if text == '':
+
         try:
             text = billboard_q.get_nowait()
             billboard_cnt = frame_cnt
@@ -569,15 +603,24 @@ while current_mode == MODE_PLAY:
         except queue.Full:
             pass
 
-    if diff_cnt % (FRAME_RATE*30) == 0:
+    if diff_cnt % (FRAME_RATE * 30) == 0:
         BALL_INIT_SPEED *= 1.1
         try:
             billboard_q.put_nowait("Ball velocity: +10%")
         except queue.Full:
             pass
 
+    if diff_cnt % (FRAME_RATE * 42) == 0:
+        PROB_TRUMP *= 1.2
+        try:
+            billboard_q.put_nowait("Trump visit: +20%")
+        except queue.Full:
+            pass
 
-
+    if diff_cnt % (FRAME_RATE * 10) == 0:
+        # A visit form Donald J. Trump? :)
+        if np.random.random(1) < PROB_TRUMP:
+            trmp_visit = True
 
     ##
     # Move ball and update scores
