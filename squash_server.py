@@ -42,7 +42,7 @@ limiter = Limiter(app, key_func=get_remote_address)
 frame = None
 frame_mutex = threading.Lock()
 
-
+server_url = '192.168.1.200'
 remote_mode = False
 left_player = dict()
 left_player['ip'] = ''
@@ -52,10 +52,7 @@ left_player['score'] = 0
 right_player = left_player.copy()
 player_mutex = threading.Lock()
 
-server_url = '192.168.1.200'
-
-ctrl_limit = "40/second"
-
+ctrl_limit = "20/second"
 
 @app.route('/get_frame', methods=['GET'])
 @limiter.limit(ctrl_limit)
@@ -119,7 +116,7 @@ def log_inn():
             resp['status'] = "right"
             print(client_data['name'], "({}) joined left side!".format(flask.request.remote_addr))
 
-        if resp['status'] is not "full":
+        if resp['status'] != "full":
             try:
                 billboard_q.put_nowait("{} joined!".format(client_data['name']))
             except queue.Full:
@@ -151,7 +148,7 @@ def log_out():
         left_player['score'] = 0
         right_player['score'] = 0
 
-        if resp['status'] is not "Not logged inn":
+        if resp['status'] != "Not logged inn":
             try:
                 billboard_q.put_nowait("{} left!".format(client_data['name']))
             except queue.Full:
