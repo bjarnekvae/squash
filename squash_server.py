@@ -43,7 +43,7 @@ frame = None
 frame_mutex = threading.Lock()
 
 server_url = '192.168.1.200'
-remote_mode = False
+remote_mode = True
 left_player = dict()
 left_player['ip'] = ''
 left_player['name'] = ''
@@ -489,6 +489,13 @@ while current_mode == MODE_PLAY:
                 current_mode = MODE_QUIT
             elif event.key == pygame.K_m:
                 muted = not muted
+            elif event.key == pygame.K_k:
+                left_player['ip'] = ''
+                left_player['name'] = ''
+                left_player['code'] = ''
+                left_player['score'] = 0
+                right_player = left_player.copy()
+
 
     if remote_mode:
         left_client_req = None
