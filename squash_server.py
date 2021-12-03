@@ -468,17 +468,6 @@ while current_mode == MODE_PLAY:
 
     frame_cnt += 1
 
-    if (left_player['name'] == '' or right_player['name'] == ''):
-        wait_text = "Waiting for players..."
-        billboard_text = FONT.render(wait_text, 1, RED)
-        screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
-        pygame.display.update()
-        clock.tick(FRAME_RATE)
-        if frame_cnt % 5 == 0:
-            with frame_mutex:
-                frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
-        continue
-
     ##
     # Handle keyboard
     for event in pygame.event.get():
@@ -495,6 +484,17 @@ while current_mode == MODE_PLAY:
                 left_player['code'] = ''
                 left_player['score'] = 0
                 right_player = left_player.copy()
+
+    if (left_player['name'] == '' or right_player['name'] == ''):
+        wait_text = "Waiting for players..."
+        billboard_text = FONT.render(wait_text, 1, RED)
+        screen.blit(billboard_text, (billboard_text.get_rect(centerx=WIDTH / 2)[0], HEIGHT/5))
+        pygame.display.update()
+        clock.tick(FRAME_RATE)
+        if frame_cnt % 5 == 0:
+            with frame_mutex:
+                frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
+        continue
 
 
     if remote_mode:
