@@ -52,7 +52,7 @@ left_player['score'] = 0
 right_player = left_player.copy()
 player_mutex = threading.Lock()
 
-ctrl_limit = "20/second"
+ctrl_limit = "40/second"
 
 @app.route('/get_frame', methods=['GET'])
 @limiter.limit(ctrl_limit)
@@ -190,7 +190,7 @@ FRAME_RATE = 120
 ##
 # Game Sounds and delay for losing
 #
-LOSE_DELAY = 2000
+LOSE_DELAY = 100
 LOSE_SOUND = pygame.mixer.Sound('beep-2.wav')
 FAIL_SOUND = pygame.mixer.Sound('beep-3.wav')
 LEFT_SOUND = pygame.mixer.Sound('beep-7.wav')
@@ -485,6 +485,7 @@ while current_mode == MODE_PLAY:
                 left_player['score'] = 0
                 right_player = left_player.copy()
 
+    '''
     if (left_player['name'] == '' or right_player['name'] == ''):
         wait_text = "Waiting for players..."
         billboard_text = FONT.render(wait_text, 1, RED)
@@ -495,6 +496,7 @@ while current_mode == MODE_PLAY:
             with frame_mutex:
                 frame = pygame.surfarray.array3d(screen).swapaxes(0, 1)
         continue
+    '''
 
 
     if remote_mode:
@@ -598,6 +600,7 @@ while current_mode == MODE_PLAY:
     #
     diff_cnt += 1
 
+    '''
     if diff_cnt % (FRAME_RATE*60) == 0:
         paddle_size = paddle_size*0.8
         leftPaddle.change_width(paddle_size)
@@ -606,11 +609,12 @@ while current_mode == MODE_PLAY:
             billboard_q.put_nowait("Paddle size: -20%")
         except queue.Full:
             pass
+    '''
 
     if diff_cnt % (FRAME_RATE * 30) == 0:
-        BALL_INIT_SPEED *= 1.1
+        BALL_INIT_SPEED *= 1.05
         try:
-            billboard_q.put_nowait("Ball velocity: +10%")
+            billboard_q.put_nowait("Ball velocity: +5%")
         except queue.Full:
             pass
 
@@ -625,6 +629,7 @@ while current_mode == MODE_PLAY:
         # A visit form Donald J. Trump? :)
         if np.random.random(1) < PROB_TRUMP:
             trmp_visit = True
+
 
     ##
     # Move ball and update scores
@@ -701,7 +706,7 @@ while current_mode == MODE_PLAY:
             right_player['score'] += 1
             playerTurn = LEFT_PLAYER
             reset_game(playerTurn)
-        elif playerTurn == RIGHT_PLAYER:
+        elif playerTurn == RIGHT_PLAYER and 1 == 0: # TODO
             if not muted:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
@@ -732,7 +737,7 @@ while current_mode == MODE_PLAY:
             left_player['score'] += 1
             playerTurn = RIGHT_PLAYER
             reset_game(playerTurn)
-        elif playerTurn == LEFT_PLAYER:
+        elif playerTurn == LEFT_PLAYER and 1 == 0: # TODO
             if not muted:
                 FAIL_SOUND.play()
             pygame.time.delay(LOSE_DELAY)
@@ -780,6 +785,8 @@ while current_mode == MODE_PLAY:
 
     pygame.display.update()
     clock.tick(FRAME_RATE)
+
+    continue
 
     if (left_player['score'] >= 10 or right_player['score'] >= 10):
         if abs(left_player['score'] - right_player['score']) > 1:

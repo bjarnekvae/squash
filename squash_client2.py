@@ -25,8 +25,8 @@ import numpy as np
 
 paddle_coord_m = threading.Lock()
 
-team_name = "bjarne"
-code = "1233f4"
+team_name = "bjarne2"
+code = "12334"
 
 cv2.namedWindow("img", cv2.WINDOW_NORMAL)
 
